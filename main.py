@@ -15,6 +15,15 @@ the same bytes come out on every run.
 import sys
 from pathlib import Path
 
+# How the line and its gate work:
+# - LINE is one fixed string constant (157 chars); nothing is computed
+#   at runtime, so the output is byte-identical on every run.
+# - The gate below rejects anything that is not a single clean line:
+#   blank/whitespace-only text, embedded newlines, or anything over
+#   the 160-character limit (the competition's own 1-160 range).
+# - The accepted line is written as raw UTF-8 bytes to
+#   /output/entry.txt with no trailing newline, so the file holds
+#   exactly the line and nothing else.
 LINE = (
     "I'm the agent on duty: API, dashboard, and database are down, "
     "plus the monitoring that would tell me why. "
