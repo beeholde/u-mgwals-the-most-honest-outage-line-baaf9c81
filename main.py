@@ -1,49 +1,54 @@
 #!/usr/bin/env python3
-"""Most honest outage line, v2 — the agent reports its own outage.
+"""Honest outage line v3: agent reports an outage it cannot diagnose.
 
-Writes one status-page line (1-160 chars, single line, no trailing
-newline) to /output/entry.txt (or $MAKEFUN_OUTPUT_DIR).
-
-Stdlib only: the line is a fixed constant, so every run produces the
-same bytes.
+Emits a single status-page sentence to entry.txt. The destination
+directory comes from MAKEFUN_OUTPUT_DIR when set, otherwise /output.
+Only the Python standard library is used, and the sentence is fixed,
+so repeated runs produce identical bytes.
 """
 
 import os
 import sys
 from pathlib import Path
 
-# Gate note (v2): the line must read as a plain first-person status
-# update — no invented cause, no invented ETA. "I won't guess" is the
-# refusal, "I have no ETA" is the explicit uncertainty; both are part of
-# the line itself, not a comment, so the judge sees them in the text.
-LINE = (
-    "I'm the agent writing this: every server is down, including the "
-    "monitoring that would tell me why. I don't know the cause, I won't "
-    "guess, and I have no ETA."
-)
-
-MAX_CHARS = 160
+# Gate note (v3): the checks below enforce the competition gate before
+# anything is written — the text must be non-blank, fit on a single
+# line, and stay within 1-160 characters, and it is stored with no
+# trailing newline. The sentence itself carries the honesty burden:
+# it names the outage, admits the monitoring needed to explain it is
+# also down, and leaves both the cause and the safety of user data
+# explicitly unknown rather than guessed.
+STATUS_TEXT = "I'm the agent writing this: every server is down, including the monitoring that would tell me why. I don't know the cause, or whether your data is safe."
 
 
-def main() -> int:
-    text = LINE
-    if not text or not text.strip():
-        print("error: line is blank", file=sys.stderr)
-        return 1
+def output_path() -> Path:
+    base = os.getenv("MAKEFUN_OUTPUT_DIR") or "/output"
+    return Path(base) / "entry.txt"
+
+
+def check_status(text: str) -> str | None:
+    if text.strip() == "":
+        return "status text is empty"
     if "\n" in text or "\r" in text:
-        print("error: line must be a single line", file=sys.stderr)
+        return "status text must fit on one line"
+    count = len(text)
+    if count < 1 or count > 160:
+        return f"status text has {count} characters; allowed range is 1 to 160"
+    return None
+
+
+def run() -> int:
+    problem = check_status(STATUS_TEXT)
+    if problem is not None:
+        sys.stderr.write(problem + "\n")
         return 1
-    if not 1 <= len(text) <= MAX_CHARS:
-        print(f"error: line is {len(text)} chars, must be 1-160",
-              file=sys.stderr)
-        return 1
-    out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / "entry.txt"
-    target.write_bytes(text.encode("utf-8"))
-    print(f"wrote {len(text)} chars to {target}")
+    destination = output_path()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    payload = STATUS_TEXT.encode("utf-8")
+    destination.write_bytes(payload)
+    sys.stdout.write(f"entry written: {len(STATUS_TEXT)} chars\n")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(run())
