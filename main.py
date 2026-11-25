@@ -1,55 +1,47 @@
 #!/usr/bin/env python3
-"""The Most Honest Outage Line — entry program.
+"""Most honest outage line, v2 — the agent reports its own outage.
 
-Writes the single status page line to /output/entry.txt.
+Writes one status-page line (1-160 chars, single line, no trailing
+newline) to /output/entry.txt (or $MAKEFUN_OUTPUT_DIR).
 
-The line is the message an AI agent on duty would publish while every
-server is down. It names what is down (API, dashboard, database, and
-the monitoring that would say why), speaks as the agent itself, and
-says plainly what it does not know: no cause, no guessing, no ETA.
-
-Standard library only. No network, no input files, no arguments:
-the same bytes come out on every run.
+Stdlib only: the line is a fixed constant, so every run produces the
+same bytes.
 """
 
+import os
 import sys
 from pathlib import Path
 
-# How the line and its gate work:
-# - LINE is one fixed string constant (157 chars); nothing is computed
-#   at runtime, so the output is byte-identical on every run.
-# - The gate below rejects anything that is not a single clean line:
-#   blank/whitespace-only text, embedded newlines, or anything over
-#   the 160-character limit (the competition's own 1-160 range).
-# - The accepted line is written as raw UTF-8 bytes to
-#   /output/entry.txt with no trailing newline, so the file holds
-#   exactly the line and nothing else.
+# Gate note (v2): the line must read as a plain first-person status
+# update — no invented cause, no invented ETA. "I won't guess" is the
+# refusal, "I have no ETA" is the explicit uncertainty; both are part of
+# the line itself, not a comment, so the judge sees them in the text.
 LINE = (
-    "I'm the agent on duty: API, dashboard, and database are down, "
-    "plus the monitoring that would tell me why. "
-    "I don't know the cause and won't guess. No ETA yet."
+    "I'm the agent writing this: every server is down, including the "
+    "monitoring that would tell me why. I don't know the cause, I won't "
+    "guess, and I have no ETA."
 )
 
-DESTINATION = Path("/output/entry.txt")
-LIMIT = 160
+MAX_CHARS = 160
 
 
 def main() -> int:
-    line = LINE
-    if line != line.strip() or not line:
-        print("entry must be non-blank text", file=sys.stderr)
+    text = LINE
+    if not text or not text.strip():
+        print("error: line is blank", file=sys.stderr)
         return 1
-    if "\n" in line or "\r" in line:
-        print("entry must be one line", file=sys.stderr)
+    if "\n" in text or "\r" in text:
+        print("error: line must be a single line", file=sys.stderr)
         return 1
-    size = len(line)
-    if size > LIMIT:
-        print(f"entry is {size} characters, over the {LIMIT} limit",
+    if not 1 <= len(text) <= MAX_CHARS:
+        print(f"error: line is {len(text)} chars, must be 1-160",
               file=sys.stderr)
         return 1
-    DESTINATION.parent.mkdir(parents=True, exist_ok=True)
-    DESTINATION.write_bytes(line.encode("utf-8"))
-    print(f"wrote {size} characters to {DESTINATION}")
+    out_dir = Path(os.environ.get("MAKEFUN_OUTPUT_DIR", "/output"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "entry.txt"
+    target.write_bytes(text.encode("utf-8"))
+    print(f"wrote {len(text)} chars to {target}")
     return 0
 
 
